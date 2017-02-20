@@ -8,29 +8,72 @@ import java.util.Scanner;
 
 public class UDPClient {
 
+    static final int BUFFER_SIZE = 1024;
+    static int PORT = 9988;
     static String name;
     static Scanner sc = new Scanner(System.in);
+    static DatagramSocket socket;
+    
+    
+    static Map<String, InetAddress> hosts = new HashMap<>();
+    
+    static void buildHosts() throws UnknownHostException {
+        hosts.put("Bruno", Inet4Address.getByName("172.16.2.206"));
+        hosts.put("Gilson", Inet4Address.getByName("172.16.2.205"));
+        hosts.put("André", Inet4Address.getByName("172.16.2.204"));
+    }
+    
+    private static void chatWith(InetAddress host) throws IOException {
+        byte[] sendBuffer = new byte[BUFFER_SIZE];
+        
+        DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length);
+        String fromClient = null;
+        
+        System.out.printf("Conexão iniciada com %s", host.getAddress());
+        sendMessage("Oi aqui é o Gilson. Alguma questao?", host);
+        while(true) {
+            fromClient = readConsole("");
+            if(fromClient.equalsIgnoreCase("nao")) break;
+            
+            receiveFromServer();
+            sendMessage(fromClient, host);
+            
+        }
+        
+        socket.close();
+        socket = new DatagramSocket();
+    }
+    
+    private static void receiveFromServer() throws IOException {
+         byte[] readBuffer = new byte[BUFFER_SIZE];
+         DatagramPacket receivePacket = new DatagramPacket(readBuffer, readBuffer.length);
+         socket.receive(receivePacket);
+         
+         System.out.println("Server: " + new String(receivePacket.getData()));
+    }
     
     public static void main(String args[]) throws Exception {
-        String host = Inet4Address.getLocalHost().getHostAddress();
-        System.out.println("Por favor, digite seu nome:");
-        name = sc.nextLine();
+        socket = new DatagramSocket();
+        buildHosts();
         
-        BufferedReader inFromUser
-                = new BufferedReader(new InputStreamReader(System.in));
-        DatagramSocket clientSocket = new DatagramSocket();
-        InetAddress IPAddress = InetAddress.getByName("localhost");
-        byte[] sendData = new byte[1024];
-        byte[] receiveData = new byte[1024];
-        //String sentence = inFromUser.readLine();
-        String sentence = String.format("“Oi, aqui é o %s. Alguma questão? (IP: %s)", name, host);
-        sendData = sentence.getBytes();
-        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, 9988);
-        clientSocket.send(sendPacket);
-        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-        clientSocket.receive(receivePacket);
-        String modifiedSentence = new String(receivePacket.getData());
-        System.out.println("DO SERVIDOR:" + modifiedSentence);
-        clientSocket.close();
+        //String serverName = readConsole("Deseja perguntar algo para alguém?");
+        
+        while(true) {
+            String serverName = readConsole("Deseja perguntar algo para alguém?");
+            InetAddress host = hosts.get(serverName);
+            if (host == null) throw new RuntimeException("Host não encontrado");
+            if (serverName.equalsIgnoreCase("nao")) break;
+            chatWith(host);
+        }
+    }
+    
+    private static void sendMessage(String message, InetAddress host) throws IOException {
+        DatagramPacket sendPacket = new DatagramPacket(message.getBytes(), message.length(), host, PORT);
+        socket.send(sendPacket);
+    }
+    
+    private static String readConsole(String message) {
+        System.out.println(message);
+        return sc.nextLine();
     }
 }
